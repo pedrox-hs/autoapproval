@@ -13,9 +13,10 @@
     "probot-app"
   ],
   "scripts": {
-    "build": "tsc -p tsconfig.json",
-    "dev": "nodemon --exec \"npm start\"",
+    "build": "ncc build index.js -o dist",
+    "dev": "nodemon --exec \"npm start\" -i lib/",
     "start": "probot run ./lib/index.js",
+    "prestart": "tsc -p tsconfig.json",
     "lint": "standard **/*.ts --fix",
     "test": "jest --coverage && standard **/*.ts",
     "test:watch": "jest --watch --notify --notifyMode=change --coverage",
@@ -35,6 +36,7 @@
     "@types/jest": "^27.5.0",
     "@types/node": "^20.8.2",
     "@typescript-eslint/parser": "^6.7.4",
+    "@vercel/ncc": "^0.36.1",
     "eslint-plugin-typescript": "^0.14.0",
     "jest": "^27.5.1",
     "nodemon": "^3.0.1",
