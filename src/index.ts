@@ -2,6 +2,11 @@ import { Probot, Context } from 'probot'
 import { PullRequestEvent, PullRequestReviewEvent } from '@octokit/webhooks-types'
 
 module.exports = (app: Probot) => {
+  app.onAny(async (context) => {
+    const payloadAction = 'action' in context.payload ? context.payload.action : 'none'
+    app.log.debug({ event: context.name, action: payloadAction })
+  })
+
   app.on(['pull_request.opened', 'pull_request.reopened', 'pull_request.ready_for_review', 'pull_request.labeled', 'pull_request.edited', 'pull_request_review'], async (context) => {
     context.log('Repo: %s', context.payload.repository.full_name)
 
