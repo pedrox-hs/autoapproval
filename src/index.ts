@@ -2,7 +2,7 @@ import { Probot, Context } from 'probot'
 import { PullRequestEvent, PullRequestReviewEvent } from '@octokit/webhooks-types'
 
 module.exports = (app: Probot) => {
-  app.on(['pull_request.opened', 'pull_request.reopened', 'pull_request.labeled', 'pull_request.edited', 'pull_request_review'], async (context) => {
+  app.on(['pull_request.opened', 'pull_request.reopened', 'pull_request.ready_for_review', 'pull_request.labeled', 'pull_request.edited', 'pull_request_review'], async (context) => {
     context.log('Repo: %s', context.payload.repository.full_name)
 
     const pr = context.payload.pull_request
@@ -89,7 +89,7 @@ async function applyLabels (context: Context, labels: string[]) {
   // if there are labels required to be added, add them
   if (labels.length > 0) {
     // trying to apply existing labels to PR. If labels didn't exist, this call will fail
-    const labelsParam = context.issue({ labels: labels })
+    const labelsParam = context.issue({ labels })
     await context.octokit.issues.addLabels(labelsParam)
   }
 }
