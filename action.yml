@@ -7,3 +7,9 @@ runs:
 branding:
   icon: "arrow-right"
   color: "green"
+inputs:
+  repository:
+    description: "Repository name"
+    default: ${{ github.repository }}
+  pr_number:
+    description: "Pull request number"
