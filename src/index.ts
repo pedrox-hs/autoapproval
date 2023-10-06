@@ -45,6 +45,7 @@ module.exports = (app: Probot) => {
       // that are fired during creation from events fired later on.
       if (!['opened', 'reopened'].includes(context.payload.action) && pr != null && pr.created_at === pr.updated_at) {
         context.log('Ignoring additional creation event: %s', context.payload.action)
+        process.exitCode = 78 // setNeutral
         return
       }
 
@@ -81,6 +82,7 @@ async function handlePullRequest (context: Context, pr: PullRequestInfo) {
     // if PR contains any ignored labels, do not proceed further
     if (ignoredLabels.length > 0) {
       context.log('PR ignored from approving: %s', ignoredLabels)
+      process.exitCode = 78 // setNeutral
       return
     }
   }
@@ -92,14 +94,12 @@ async function handlePullRequest (context: Context, pr: PullRequestInfo) {
   let requiredLabelsSatisfied
   if (config.required_labels_mode === 'one_of') {
     // one of the required_labels needs to be applied
-    const appliedRequiredLabels = config.required_labels
-      .filter((requiredLabel: any) => prLabels.includes(requiredLabel))
-    requiredLabelsSatisfied = appliedRequiredLabels.length > 0
+    requiredLabelsSatisfied = config.required_labels
+      .some((requiredLabel: any) => prLabels.includes(requiredLabel))
   } else {
     // all of the required_labels need to be applied
-    const missingRequiredLabels = config.required_labels
-      .filter((requiredLabel: any) => !prLabels.includes(requiredLabel))
-    requiredLabelsSatisfied = missingRequiredLabels.length === 0
+    requiredLabelsSatisfied = config.required_labels
+      .every((requiredLabel: any) => prLabels.includes(requiredLabel))
   }
 
   if (requiredLabelsSatisfied && ownerSatisfied) {
@@ -109,7 +109,10 @@ async function handlePullRequest (context: Context, pr: PullRequestInfo) {
     if (reviews.length > 0) {
       context.log('PR has already reviews')
       const isDismissed = reviews.filter((review: any) => review.state !== 'APPROVED').length > 0
-      if (!isDismissed) return
+      if (!isDismissed) {
+        process.exitCode = 78 // setNeutral
+        return
+      }
       message = 'Review was dismissed, approve again'
     } else {
       message = 'PR approved first time'
@@ -117,7 +120,7 @@ async function handlePullRequest (context: Context, pr: PullRequestInfo) {
 
     await applyAutoMerge(context, pr, config.auto_merge_labels, config.auto_rebase_merge_labels, config.auto_squash_merge_labels)
     await approvePullRequest(context, pr)
-    await applyLabels(context, pr, config.apply_labels as string[])
+    await applyLabels(context, pr, config.apply_labels)
 
     context.log(message)
   } else {

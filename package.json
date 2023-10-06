@@ -13,7 +13,7 @@
     "probot-app"
   ],
   "scripts": {
-    "build": "ncc build index.js -o dist",
+    "build": "ncc build index.js -o dist && standard **/*.ts --fix",
     "dev": "nodemon --exec \"npm start\" -i lib/",
     "start": "probot run ./lib/index.js",
     "prestart": "tsc -p tsconfig.json",
