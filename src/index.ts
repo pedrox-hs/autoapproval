@@ -30,16 +30,22 @@ module.exports = (app: Probot) => {
     const config: any = await context.config('autoapproval.yml')
     context.log(config, '\n\nLoaded config')
 
-    // determine if the PR has any "blacklisted" labels
+    // determine if the PR has any "ignored" labels
     const prLabels: string[] = pr.labels.map((label: any) => label.name)
-    let blacklistedLabels: string[] = []
-    if (config.blacklisted_labels !== undefined) {
-      blacklistedLabels = config.blacklisted_labels
-        .filter((blacklistedLabel: any) => prLabels.includes(blacklistedLabel))
+    let ignoredLabels: string[] = []
 
-      // if PR contains any black listed labels, do not proceed further
-      if (blacklistedLabels.length > 0) {
-        context.log('PR black listed from approving: %s', blacklistedLabels)
+    if (config.blacklisted_labels !== undefined) {
+      context.log('blacklisted_labels is deprecated, please use ignored_labels instead')
+      config.ignored_labels = config.blacklisted_labels
+    }
+
+    if (config.ignored_labels !== undefined) {
+      ignoredLabels = config.ignored_labels
+        .filter((ignoreLabel: any) => prLabels.includes(ignoreLabel))
+
+      // if PR contains any ignored labels, do not proceed further
+      if (ignoredLabels.length > 0) {
+        context.log('PR ignored from approving: %s', ignoredLabels)
         return
       }
     }

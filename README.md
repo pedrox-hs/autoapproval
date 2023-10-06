@@ -97,14 +97,14 @@ If the value set to `one_of`, then it's enough to have only of the `required_lab
 
 ---
 
-### blacklisted_labels
+### ignored_labels
 
 Defines the list of labels on PR, which will prevent the PR from being automatically approved. For example:
 ```
-blacklisted_labels:
+ignored_labels:
   - wip
 ```
-Assign an empty array if you do not want to blacklist any labels.
+Assign an empty array if you do not want to denylist any labels.
 
 ---
 
