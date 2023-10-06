@@ -1,6 +1,23 @@
 import * as core from '@actions/core'
 import { Context, Probot } from 'probot'
 
+type ReviewInfo = {
+  user: string
+  state: string
+}
+
+type PullRequestInfo = {
+  id: string
+  url: string
+  owner: string
+  repo: string
+
+  author: string
+  number: number
+  labels: string[]
+  reviews: ReviewInfo[]
+}
+
 module.exports = (app: Probot) => {
   app.onAny(async (context) => {
     const payloadAction = 'action' in context.payload ? context.payload.action : 'none'
@@ -12,14 +29,12 @@ module.exports = (app: Probot) => {
     async (context) => {
       const pr = 'pull_request' in context.payload ? context.payload.pull_request : undefined
       const prNumber = core.getInput('pr_number') || pr?.number
-      const repository = core.getInput('repository') || pr?.base.repo.full_name || context.payload.repository.full_name
+      const repository = core.getInput('repository') || context.payload.repository.full_name
 
       if (!prNumber) {
         core.setFailed('No PR number found')
         return
       }
-
-      const pullRequest = await getPullRequestInfo(context, repository, Number(prNumber))
 
       // NOTE(dabrady) When a PR is first opened, it can fire several different kinds of events if the author e.g. requests
       // reviewers or adds labels during creation. This triggers parallel runs of our GitHub App, so we need to filter out
@@ -33,21 +48,22 @@ module.exports = (app: Probot) => {
         return
       }
 
+      const pullRequest = await getPullRequestInfo(context, repository, Number(prNumber))
       await handlePullRequest(context, pullRequest)
-    },
+    }
   )
 }
 
-async function handlePullRequest(context: Context, pr: PullRequestInfo) {
+async function handlePullRequest (context: Context, pr: PullRequestInfo) {
   context.log('Repo: %s', pr.repo)
   context.log('PR: %s', pr.url)
 
-  console.log('Event: %s', context.name)
+  context.log('Event: %s', context.name)
   context.log('Action: %s', 'action' in context.payload ? context.payload.action : 'none')
 
   // reading configuration
   const config: any = await context.config('autoapproval.yml')
-  context.log(config, '\n\nLoaded config')
+  context.log.debug(config, '\n\nLoaded config')
 
   // determine if the PR has any "ignored" labels
   let ignoredLabels: string[] = []
@@ -87,13 +103,13 @@ async function handlePullRequest(context: Context, pr: PullRequestInfo) {
   }
 
   if (requiredLabelsSatisfied && ownerSatisfied) {
-    const reviews = pr.reviews.filter((review: any) => review.user in ['autoapproval[bot]', 'github-actions'])
+    const reviews = pr.reviews.filter((review: any) => ['autoapproval[bot]', 'github-actions'].includes(review.user))
     let message: string
 
     if (reviews.length > 0) {
       context.log('PR has already reviews')
-      const isDismissed = reviews.filter((review: any) => review.state === 'DISMISSED').length > 0
-      if (isDismissed) return;
+      const isDismissed = reviews.filter((review: any) => review.state !== 'APPROVED').length > 0
+      if (!isDismissed) return
       message = 'Review was dismissed, approve again'
     } else {
       message = 'PR approved first time'
@@ -101,15 +117,19 @@ async function handlePullRequest(context: Context, pr: PullRequestInfo) {
 
     await applyAutoMerge(context, pr, config.auto_merge_labels, config.auto_rebase_merge_labels, config.auto_squash_merge_labels)
     await approvePullRequest(context, pr)
-    applyLabels(context, pr, config.apply_labels as string[])
+    await applyLabels(context, pr, config.apply_labels as string[])
 
     context.log(message)
   } else {
     // one of the checks failed
-    core.setFailed(`Condition failed! \n - missing required labels: ${requiredLabelsSatisfied}\n - PR owner found: ${ownerSatisfied}`)
+    core.setFailed(`
+      Condition failed!
+      - missing required labels: ${requiredLabelsSatisfied}
+      - PR owner found: ${ownerSatisfied}
+      `
+    )
   }
 }
-
 
 const getPrInfoQuery = `
   query ($owner: String!, $repoName: String!, $prNumber: Int!) {
@@ -154,10 +174,10 @@ const enableAutoMergeMutation = `
   }
 `
 
-async function getPullRequestInfo(context: Context, repository: String, number: number): Promise<PullRequestInfo> {
+async function getPullRequestInfo (context: Context, repository: String, number: number): Promise<PullRequestInfo> {
   const [owner, repo] = repository.split('/')
   const prInfo: any = await context.octokit.graphql(getPrInfoQuery, {
-    owner: owner,
+    owner,
     repoName: repo,
     prNumber: number
   })
@@ -170,8 +190,9 @@ async function getPullRequestInfo(context: Context, repository: String, number: 
         user: review.author.login,
         state: review.state
       }
-    },
+    }
   )
+
   return {
     id: pr.id,
     url: pr.url,
@@ -180,32 +201,37 @@ async function getPullRequestInfo(context: Context, repository: String, number: 
     owner,
     repo,
     labels,
-    reviews,
+    reviews
   }
 }
 
-async function approvePullRequest(context: Context, pr: PullRequestInfo) {
+async function approvePullRequest (context: Context, pr: PullRequestInfo) {
   const prParams = context.pullRequest({
     owner: pr.owner,
     repo: pr.repo,
     pull_number: pr.number,
     event: 'APPROVE' as const,
-    body: 'Approved :+1:',
+    body: 'Approved :+1:'
   })
   await context.octokit.pulls.createReview(prParams)
 }
 
-async function applyLabels(context: Context, pr: PullRequestInfo, labels: string[]) {
+async function applyLabels (context: Context, pr: PullRequestInfo, labels: string[]) {
   // if there are labels required to be added, add them
-  if (labels.length > 0) {
+  const labelsToApply = labels.filter((label: string) => !pr.labels.includes(label))
+  if (labelsToApply.length > 0) {
     // trying to apply existing labels to PR. If labels didn't exist, this call will fail
-    const labelsParam = context.issue({ labels, pull_number: pr.number })
-    await context.octokit.issues.addLabels(labelsParam)
+    const labelsParam = context.issue({ labels: labelsToApply, pull_number: pr.number })
+    try {
+      await context.octokit.issues.addLabels(labelsParam)
+    } catch (error) {
+      context.log.error('Failed to apply labels: %s', error)
+    }
   }
 }
 
-async function applyAutoMerge(context: Context, pr: PullRequestInfo, mergeLabels: string[], rebaseLabels: string[], squashLabels: string[]) {
-  const prLabels = pr.labels;
+async function applyAutoMerge (context: Context, pr: PullRequestInfo, mergeLabels: string[], rebaseLabels: string[], squashLabels: string[]) {
+  const prLabels = pr.labels
 
   let automergeMethod = mergeLabels && mergeLabels.some((label: string) => prLabels.includes(label)) ? 'MERGE' : undefined
   automergeMethod = rebaseLabels && rebaseLabels.some((label: string) => prLabels.includes(label)) ? 'REBASE' : automergeMethod
@@ -216,28 +242,11 @@ async function applyAutoMerge(context: Context, pr: PullRequestInfo, mergeLabels
   }
 }
 
-async function enableAutoMerge(context: Context, pr: PullRequestInfo, method: string) {
+async function enableAutoMerge (context: Context, pr: PullRequestInfo, method: string) {
   context.log.info('Auto merging with merge method %s', method)
 
   await context.octokit.graphql(enableAutoMergeMutation, {
     pullRequestId: pr.id,
     mergeMethod: method
   })
-}
-
-type PullRequestInfo = {
-  id: string
-  url: string
-  owner: string
-  repo: string
-
-  author: string
-  number: number
-  labels: string[]
-  reviews: ReviewInfo[]
-}
-
-type ReviewInfo = {
-  user: string
-  state: string
 }

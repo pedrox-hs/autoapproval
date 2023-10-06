@@ -9,9 +9,6 @@
               "labels": {
                   "nodes": [
                       {
-                          "name": "merge"
-                      },
-                      {
                           "name": "wip"
                       }
                   ]
@@ -22,7 +19,7 @@
                           "author": {
                               "login": "autoapproval[bot]"
                           },
-                          "state": "APPROVED"
+                          "state": "DISMISSED"
                       }
                   ]
               },
