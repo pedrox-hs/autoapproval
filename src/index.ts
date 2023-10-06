@@ -221,7 +221,7 @@ async function applyLabels (context: Context, pr: PullRequestInfo, labels: strin
   const labelsToApply = labels.filter((label: string) => !pr.labels.includes(label))
   if (labelsToApply.length > 0) {
     // trying to apply existing labels to PR. If labels didn't exist, this call will fail
-    const labelsParam = context.issue({ labels: labelsToApply, pull_number: pr.number })
+    const labelsParam = context.issue({ labels: labelsToApply, issue_number: pr.number })
     try {
       await context.octokit.issues.addLabels(labelsParam)
     } catch (error) {

@@ -1,4 +1,26 @@
-[
-    
-]
-  
+{
+    "data": {
+        "repository": {
+            "pullRequest": {
+                "author": {
+                    "login": "dkhmelenko"
+                },
+                "id": "MDExOlB1bGxSZXF1ZN0NjExMzU2MTgy",
+                "labels": {
+                    "nodes": [
+                        {
+                            "name": "merge"
+                        },
+                        {
+                            "name": "wip"
+                        }
+                    ]
+                },
+                "reviews": {
+                    "nodes": []
+                },
+                "url": "https://github.com/dkhmelenko/autoapproval/pull/1"
+            }
+        }
+    }
+}
