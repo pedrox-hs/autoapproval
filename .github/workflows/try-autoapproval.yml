@@ -10,6 +10,7 @@ jobs:
   approval-list:
     name: Generating approval list
     runs-on: ubuntu-latest
+    if: github.event.workflow_run.pull_requests
     permissions:
       pull-requests: read
     outputs:
