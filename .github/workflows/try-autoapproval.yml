@@ -2,11 +2,6 @@ name: Automatic approve PR
 
 on:
   workflow_call:
-    inputs:
-      pull_requests:
-        description: The github.event.workflow_run.pull_requests value in JSON
-        type: string
-        required: true
 
 concurrency:
   group: autoapproval-${{ github.ref }}
